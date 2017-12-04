@@ -135,7 +135,7 @@ void Breaker::gameStart()
     auto player = this->getChildByTag(this->playerTag);
     player->setPosition(Vec2(this->visibleSize.width/2 + this->origin.x, this->origin.y+PLAYER_HEIGHT/2));
     auto ball = this->getChildByTag(this->ballTag);
-    ball->getPhysicsBody()->setVelocity(Vec2(cocos2d::RandomHelper::random_int(300, 400), cocos2d::RandomHelper::random_int(300, 400)));
+    ball->getPhysicsBody()->setVelocity(Vec2(cocos2d::RandomHelper::random_int(100, 200), cocos2d::RandomHelper::random_int(100, 200)));
 }
 
 void Breaker::gameOver()
