@@ -17,11 +17,13 @@ public:
     static cocos2d::Scene* createScene();
     virtual bool init();
     CREATE_FUNC(Breaker);
-    
+
     void keyPressedCallback(EventKeyboard::KeyCode keyCode, Event *event);
     void keyReleasedCallback(EventKeyboard::KeyCode keyCode, Event *event);
     
     virtual void update(float delta);
+    virtual void onEnter();
+    virtual void onExit();
     
 private:
     
@@ -32,7 +34,6 @@ private:
     
     Vec2 origin;
     Size visibleSize;
-    void addNewSpriteAtPosition(Vec2 p, int tag);
     
     int playerTag;
     int ballTag;
@@ -41,10 +42,14 @@ private:
     bool moveRight;
     float playerMoveSpeed;
     void createPlayer(int tag);
+    void createBall(int tag);
+    void createBrickAtPosition(Vec2 p);
     
     void registerKeyboardListener();
     
     int playTimes;
+    
+    Vector<Sprite*> bricksVec;
 };
 
 #endif /* BreakerScene_h */

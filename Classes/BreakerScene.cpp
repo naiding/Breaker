@@ -35,6 +35,7 @@ bool Breaker::init()
     this->playTimes = 0;
     this->playerTag = 123;
     this->ballTag = 456;
+    
     this->visibleSize = Director::getInstance()->getVisibleSize();
     this->origin = Director::getInstance()->getVisibleOrigin();
     
@@ -51,13 +52,64 @@ bool Breaker::init()
     this->addChild(edgesNode);
 
     createPlayer(this->playerTag);
-    registerKeyboardListener();
-    
     gameInit();
-    
     scheduleUpdate();
     
     return true;
+}
+
+void Breaker::onEnter()
+{
+    Layer::onEnter();
+    
+    registerKeyboardListener();
+    
+    auto listener = EventListenerPhysicsContact::create();
+    listener->onContactBegin = [](PhysicsContact& contact)
+    {
+//        auto spriteA = (Sprite *)contact.getShapeA()->getBody()->getNode();
+//        auto spriteB = (Sprite *)contact.getShapeB()->getBody()->getNode();
+//
+//        if (spriteA && spriteA->getTag() == 1
+//            && spriteA && spriteA->getTag() == 1)
+//        {
+//            spriteA->setColor(Color3B::YELLOW);
+//            spriteB->setColor(Color3B::YELLOW);
+//        }
+        log("on Contact Begin");
+        return true;
+    };
+    
+    listener->onContactPreSolve = [] (PhysicsContact& contact, PhysicsContactPreSolve& solve)
+    {
+        log("on Contact PreSolve");
+        return true;
+    };
+    
+    listener->onContactPostSolve = [] (PhysicsContact& contact, const PhysicsContactPostSolve& solve)
+    {
+        log("on Contact PostSolve");
+        return true;
+    };
+    
+    listener->onContactSeparate = [] (PhysicsContact& contact)
+    {
+        log("on Contact Seperate");
+        return true;
+    };
+    
+    Director::getInstance()->getEventDispatcher()->addEventListenerWithFixedPriority(listener, 1);
+    
+    log("On Enter");
+}
+
+void Breaker::onExit()
+{
+    Layer::onExit();
+    log("On Exit");
+    
+    EventDispatcher *eventDispatcher = Director::getInstance() -> getEventDispatcher();
+    eventDispatcher -> removeAllEventListeners();
 }
 
 void Breaker::gameInit()
@@ -66,7 +118,17 @@ void Breaker::gameInit()
     this->moveLeft = false;
     this->moveRight = false;
     this->playerMoveSpeed = 800;
-    addNewSpriteAtPosition(Vec2(this->visibleSize.width/2, PLAYER_HEIGHT+BALL_RADIUS/2), this->ballTag);
+    createBall(this->ballTag);
+    
+    auto sp1 = Sprite::create();
+    sp1->setTag(1);
+    
+    this->bricksVec.insert(0, sp1);
+    
+    for(auto sp : this->bricksVec)
+    {
+        log("sprite tag = %d", sp->getTag());
+    }
 }
 
 void Breaker::gameStart()
@@ -84,10 +146,10 @@ void Breaker::gameOver()
 {
     this->isStart = false;
     this->removeChildByTag(this->ballTag);
-    log("game over");
+    log("Game Over");
 }
 
-void Breaker::addNewSpriteAtPosition(Vec2 p, int tag)
+void Breaker::createBall(int tag)
 {
     auto sp = Sprite::create("ball.png");
     sp->setTag(tag);
@@ -99,8 +161,9 @@ void Breaker::addNewSpriteAtPosition(Vec2 p, int tag)
     body->getShape(0)->setFriction(0);    //摩擦系数
     body->getShape(0)->setRestitution(1); //弹力系数
     body->setGravityEnable(false);
+    body->setContactTestBitmask(0xFFFFFFFF);
     sp->setPhysicsBody(body);
-    sp->setPosition(p);
+    sp->setPosition(Vec2(this->visibleSize.width/2, PLAYER_HEIGHT+BALL_RADIUS/2));
     this->addChild(sp);
 }
 
@@ -116,6 +179,7 @@ void Breaker::createPlayer(int tag)
     body->getShape(0)->setFriction(0);    //摩擦系数
     body->getShape(0)->setRestitution(1); //弹力系数
     body->setDynamic(false);
+    body->setContactTestBitmask(0xFFFFFFFF);
     player->setPhysicsBody(body);
     
     this->addChild(player, 1);
