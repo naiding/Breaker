@@ -20,7 +20,8 @@ public:
 
     void keyPressedCallback(EventKeyboard::KeyCode keyCode, Event *event);
     void keyReleasedCallback(EventKeyboard::KeyCode keyCode, Event *event);
-    
+    virtual bool onContactBegin(PhysicsContact& contact);
+
     virtual void update(float delta);
     virtual void onEnter();
     virtual void onExit();
@@ -43,7 +44,7 @@ private:
     float playerMoveSpeed;
     void createPlayer(int tag);
     void createBall(int tag);
-    void createBrickAtPosition(Vec2 p);
+    Sprite* createBrickAtPosition(Vec2 p, int tag);
     
     void registerKeyboardListener();
     

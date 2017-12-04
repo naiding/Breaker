@@ -14,11 +14,13 @@ USING_NS_CC;
 #define PLAYER_WIDTH 120
 #define PLAYER_HEIGHT 30
 #define BALL_RADIUS 30
+#define BRICK_WIDTH 80
+#define BRICK_HEIGHT 20
 
 Scene* Breaker::createScene()
 {
     auto scene = Scene::createWithPhysics();
-    scene->getPhysicsWorld()->setDebugDrawMask(PhysicsWorld::DEBUGDRAW_ALL);
+//    scene->getPhysicsWorld()->setDebugDrawMask(PhysicsWorld::DEBUGDRAW_ALL);
 
     auto layer = Breaker::create();
     scene->addChild(layer);
@@ -33,8 +35,8 @@ bool Breaker::init()
     }
     
     this->playTimes = 0;
-    this->playerTag = 123;
-    this->ballTag = 456;
+    this->playerTag = 10;
+    this->ballTag = 11;
     
     this->visibleSize = Director::getInstance()->getVisibleSize();
     this->origin = Director::getInstance()->getVisibleOrigin();
@@ -65,39 +67,7 @@ void Breaker::onEnter()
     registerKeyboardListener();
     
     auto listener = EventListenerPhysicsContact::create();
-    listener->onContactBegin = [](PhysicsContact& contact)
-    {
-//        auto spriteA = (Sprite *)contact.getShapeA()->getBody()->getNode();
-//        auto spriteB = (Sprite *)contact.getShapeB()->getBody()->getNode();
-//
-//        if (spriteA && spriteA->getTag() == 1
-//            && spriteA && spriteA->getTag() == 1)
-//        {
-//            spriteA->setColor(Color3B::YELLOW);
-//            spriteB->setColor(Color3B::YELLOW);
-//        }
-        log("on Contact Begin");
-        return true;
-    };
-    
-    listener->onContactPreSolve = [] (PhysicsContact& contact, PhysicsContactPreSolve& solve)
-    {
-        log("on Contact PreSolve");
-        return true;
-    };
-    
-    listener->onContactPostSolve = [] (PhysicsContact& contact, const PhysicsContactPostSolve& solve)
-    {
-        log("on Contact PostSolve");
-        return true;
-    };
-    
-    listener->onContactSeparate = [] (PhysicsContact& contact)
-    {
-        log("on Contact Seperate");
-        return true;
-    };
-    
+    listener->onContactBegin = CC_CALLBACK_1(Breaker::onContactBegin, this);
     Director::getInstance()->getEventDispatcher()->addEventListenerWithFixedPriority(listener, 1);
     
     log("On Enter");
@@ -112,6 +82,32 @@ void Breaker::onExit()
     eventDispatcher -> removeAllEventListeners();
 }
 
+bool Breaker::onContactBegin(cocos2d::PhysicsContact &contact)
+{
+    log("on Contact Begin");
+    auto spriteA = (Sprite *)contact.getShapeA()->getBody()->getNode();
+    auto spriteB = (Sprite *)contact.getShapeB()->getBody()->getNode();
+    
+    for(auto brick : this->bricksVec)
+    {
+        if (brick->getTag() == spriteA->getTag())
+        {
+            this->removeChildByTag(spriteA->getTag());
+            this->bricksVec.eraseObject(brick);
+        }
+        if (brick->getTag() == spriteB->getTag())
+        {
+            this->removeChildByTag(spriteB->getTag());
+            this->bricksVec.eraseObject(brick);
+        }
+    }
+    
+//    __String *x = __String::createWithFormat("%d", spriteA->getTag());
+//    log(x->getCString());
+
+    return true;
+}
+
 void Breaker::gameInit()
 {
     this->isStart = false;
@@ -120,14 +116,14 @@ void Breaker::gameInit()
     this->playerMoveSpeed = 800;
     createBall(this->ballTag);
     
-    auto sp1 = Sprite::create();
-    sp1->setTag(1);
-    
-    this->bricksVec.insert(0, sp1);
-    
-    for(auto sp : this->bricksVec)
+    for(int i = 1; i <= 6; i++)
     {
-        log("sprite tag = %d", sp->getTag());
+        for (int j = 1; j <= 10; j++)
+        {
+            Vec2 point = Vec2(this->origin.x + 40 + (BRICK_WIDTH+5)*j, this->origin.y + 400 + (BRICK_HEIGHT+3)*i);
+            Sprite* brick = createBrickAtPosition(point, 20+i*10+j);
+            this->bricksVec.insert(0, brick);
+        }
     }
 }
 
@@ -139,13 +135,19 @@ void Breaker::gameStart()
     auto player = this->getChildByTag(this->playerTag);
     player->setPosition(Vec2(this->visibleSize.width/2 + this->origin.x, this->origin.y+PLAYER_HEIGHT/2));
     auto ball = this->getChildByTag(this->ballTag);
-    ball->getPhysicsBody()->setVelocity(Vec2(500, 400));
+    ball->getPhysicsBody()->setVelocity(Vec2(cocos2d::RandomHelper::random_int(300, 400), cocos2d::RandomHelper::random_int(300, 400)));
 }
 
 void Breaker::gameOver()
 {
     this->isStart = false;
     this->removeChildByTag(this->ballTag);
+    for(auto brick : this->bricksVec)
+    {
+        this->removeChildByTag(brick->getTag());
+    }
+    this->bricksVec.clear();
+    
     log("Game Over");
 }
 
@@ -165,6 +167,26 @@ void Breaker::createBall(int tag)
     sp->setPhysicsBody(body);
     sp->setPosition(Vec2(this->visibleSize.width/2, PLAYER_HEIGHT+BALL_RADIUS/2));
     this->addChild(sp);
+}
+
+Sprite* Breaker::createBrickAtPosition(Vec2 p, int tag)
+{
+    auto brick = Sprite::create("brick.png", Rect(0, 0, BRICK_WIDTH, BRICK_HEIGHT));
+    brick->setPosition(p);
+    brick->setTag(tag);
+    
+    auto body = PhysicsBody::createBox(brick->getContentSize());
+    body->setGravityEnable(false);
+    body->getShape(0)->setDensity(0.1);   //密度
+    body->getShape(0)->setFriction(0);    //摩擦系数
+    body->getShape(0)->setRestitution(1); //弹力系数
+    body->setDynamic(false);
+    body->setContactTestBitmask(0xFFFFFFFF);
+    brick->setPhysicsBody(body);
+    
+    this->addChild(brick, 1);
+    
+    return brick;
 }
 
 void Breaker::createPlayer(int tag)
