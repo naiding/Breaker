@@ -34,7 +34,7 @@ bool HelloWorld::init()
     this->origin = Director::getInstance()->getVisibleOrigin();
 
     // 2. add Background
-    createBackground(1);
+//    createBackground(1);
     
     // 3. add Welcome label
     createWelcomeLabel(2);
@@ -68,7 +68,7 @@ void HelloWorld::createBackground(int tag)
 
 void HelloWorld::createWelcomeLabel(int tag)
 {
-    auto label = Label::createWithTTF("Welcome to Breaker !!", "fonts/Marker Felt.ttf", 40);
+    auto label = Label::createWithTTF("Welcome to Breaker !!", "fonts/Marker Felt.ttf", 50);
 //    auto label = Label::createWithSystemFont("Welcome to Breaker !!", "Arial", 40);
     label->setTag(tag);
     label->setColor(Color3B(26,83,255));
@@ -86,14 +86,18 @@ void HelloWorld::createWelcomeLabel(int tag)
 void HelloWorld::createMenu(int tag)
 {
     MenuItemFont::setFontName("Hercunalum");
-    MenuItemFont::setFontSize(30);
+    MenuItemFont::setFontSize(40);
     
     MenuItemFont *start = MenuItemFont::create("Start", CC_CALLBACK_1(HelloWorld::menuStartCallback, this));
     MenuItemFont *setting = MenuItemFont::create("Setting", CC_CALLBACK_1(HelloWorld::menuSettingCallback, this));
     MenuItemFont *quit = MenuItemFont::create("Quit", CC_CALLBACK_1(HelloWorld::menuQuitCallback, this));
     
+    start->setColor(Color3B(200, 210, 205));
+    setting->setColor(Color3B(200, 210, 205));
+    quit->setColor(Color3B(200, 210, 205));
+
     Menu *menu = Menu::create(start, setting, quit, NULL);
-    menu->alignItemsVertically();
+    menu->alignItemsVerticallyWithPadding(20);
     this->addChild(menu);
     menu->setTag(tag);
 }

@@ -26,7 +26,7 @@ bool Setting::init()
     this->visibleSize = Director::getInstance()->getVisibleSize();
     this->origin = Director::getInstance()->getVisibleOrigin();
     
-    createBackground(1);
+//    createBackground(1);
     createMenu(2);
     
     return true;
