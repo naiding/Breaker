@@ -29,6 +29,7 @@ public:
 private:
     
     bool isStart;
+    bool isPause;
     void gameInit();
     void gameStart();
     void gameOver();
@@ -36,12 +37,14 @@ private:
     Vec2 origin;
     Size visibleSize;
     
+    
     int playerTag;
     int ballTag;
     
     bool moveLeft;
     bool moveRight;
     float playerMoveSpeed;
+    Vec2 ballMoveSpeed;
     void createPlayer(int tag);
     void createBall(int tag);
     Sprite* createBrickAtPosition(Vec2 p, int tag);

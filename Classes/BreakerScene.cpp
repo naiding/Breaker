@@ -111,6 +111,7 @@ bool Breaker::onContactBegin(cocos2d::PhysicsContact &contact)
 void Breaker::gameInit()
 {
     this->isStart = false;
+    this->isPause = false;
     this->moveLeft = false;
     this->moveRight = false;
     this->playerMoveSpeed = 800;
@@ -132,6 +133,7 @@ void Breaker::gameStart()
     if(this->playTimes > 0) gameInit();
     this->playTimes += 1;
     this->isStart = true;
+    this->isPause = false;
     auto player = this->getChildByTag(this->playerTag);
     player->setPosition(Vec2(this->visibleSize.width/2 + this->origin.x, this->origin.y+PLAYER_HEIGHT/2));
     auto ball = this->getChildByTag(this->ballTag);
@@ -141,6 +143,7 @@ void Breaker::gameStart()
 void Breaker::gameOver()
 {
     this->isStart = false;
+    this->isPause = false;
     this->removeChildByTag(this->ballTag);
     for(auto brick : this->bricksVec)
     {
@@ -159,9 +162,9 @@ void Breaker::createBall(int tag)
     auto body = PhysicsBody::createCircle(sp->getContentSize().width/2);
     body->setVelocity(Vec2(0, 0));
     body->setMass(0);
-    body->getShape(0)->setDensity(0.1);   //密度
-    body->getShape(0)->setFriction(0);    //摩擦系数
-    body->getShape(0)->setRestitution(1); //弹力系数
+    body->getShape(0)->setDensity(0.1);
+    body->getShape(0)->setFriction(0);
+    body->getShape(0)->setRestitution(1);
     body->setGravityEnable(false);
     body->setContactTestBitmask(0xFFFFFFFF);
     sp->setPhysicsBody(body);
@@ -177,9 +180,9 @@ Sprite* Breaker::createBrickAtPosition(Vec2 p, int tag)
     
     auto body = PhysicsBody::createBox(brick->getContentSize());
     body->setGravityEnable(false);
-    body->getShape(0)->setDensity(0.1);   //密度
-    body->getShape(0)->setFriction(0);    //摩擦系数
-    body->getShape(0)->setRestitution(1); //弹力系数
+    body->getShape(0)->setDensity(0.1);
+    body->getShape(0)->setFriction(0);
+    body->getShape(0)->setRestitution(1);
     body->setDynamic(false);
     body->setContactTestBitmask(0xFFFFFFFF);
     brick->setPhysicsBody(body);
@@ -191,15 +194,16 @@ Sprite* Breaker::createBrickAtPosition(Vec2 p, int tag)
 
 void Breaker::createPlayer(int tag)
 {
-    auto player = Sprite::create("player.png", Rect(0, 0, PLAYER_WIDTH, PLAYER_HEIGHT));
+    auto player = Sprite::create("player.png");
+    player->setScale(0.35, 0.35);
     player->setPosition(Vec2(this->visibleSize.width/2 + this->origin.x, this->origin.y+PLAYER_HEIGHT/2));
     player->setTag(tag);
     
     auto body = PhysicsBody::createBox(player->getContentSize());
     body->setGravityEnable(false);
-    body->getShape(0)->setDensity(0.1);   //密度
-    body->getShape(0)->setFriction(0);    //摩擦系数
-    body->getShape(0)->setRestitution(1); //弹力系数
+    body->getShape(0)->setDensity(0.1);
+    body->getShape(0)->setFriction(0);
+    body->getShape(0)->setRestitution(1);
     body->setDynamic(false);
     body->setContactTestBitmask(0xFFFFFFFF);
     player->setPhysicsBody(body);
@@ -219,7 +223,7 @@ void Breaker::registerKeyboardListener()
 
 void Breaker::keyPressedCallback(EventKeyboard::KeyCode keyCode, Event *event)
 {
-    if (this->isStart)
+    if (this->isStart && !this->isPause)
     {
         if (int(keyCode) == 26 )
         {
@@ -239,7 +243,27 @@ void Breaker::keyPressedCallback(EventKeyboard::KeyCode keyCode, Event *event)
     }
 //    __String *x = __String::createWithFormat("%d", int(keyCode));
 //    log(x->getCString());
-    if(int(keyCode) == 59 && !isStart) gameStart();
+    if(int(keyCode) == 59 && !this->isStart)
+    {
+        log("Start !!");
+        gameStart();
+    }
+    else if(int(keyCode) == 59 && this->isStart && !this->isPause)
+    {
+        log("Pause !!");
+        this->isPause = true;
+        auto ball = this->getChildByTag(this->ballTag);
+        this->ballMoveSpeed = ball->getPhysicsBody()->getVelocity();
+        ball->getPhysicsBody()->setVelocity(Vec2(0, 0));
+
+    }
+    else if(int(keyCode) == 59 && this->isStart && this->isPause)
+    {
+        log("Resume !!");
+        this->isPause = false;
+        auto ball = this->getChildByTag(this->ballTag);
+        ball->getPhysicsBody()->setVelocity(this->ballMoveSpeed);
+    }
 }
 
 void Breaker::keyReleasedCallback(EventKeyboard::KeyCode keyCode, Event *event)
@@ -253,7 +277,7 @@ void Breaker::keyReleasedCallback(EventKeyboard::KeyCode keyCode, Event *event)
 
 void Breaker::update(float delta)
 {
-    if (this->isStart)
+    if (this->isStart && !this->isPause)
     {
         if(this->moveLeft && !this->moveRight)
         {
