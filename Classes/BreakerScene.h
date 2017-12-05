@@ -40,6 +40,7 @@ private:
     
     int playerTag;
     int ballTag;
+    int statusLabelTag;
     
     bool moveLeft;
     bool moveRight;
@@ -47,6 +48,7 @@ private:
     Vec2 ballMoveSpeed;
     void createPlayer(int tag);
     void createBall(int tag);
+    void createStatusLabel(int tag);
     Sprite* createBrickAtPosition(Vec2 p, int tag);
     
     void registerKeyboardListener();

@@ -11,11 +11,16 @@
 
 USING_NS_CC;
 
-#define PLAYER_WIDTH 120
-#define PLAYER_HEIGHT 30
-#define BALL_RADIUS 30
-#define BRICK_WIDTH 80
-#define BRICK_HEIGHT 20
+#define PLAYER_SCALE 0.5
+#define PLAYER_WIDTH 500*PLAYER_SCALE
+#define PLAYER_HEIGHT 100*PLAYER_SCALE
+
+#define BALL_SCALE 0.25
+#define BALL_RADIUS 300*BALL_SCALE
+
+#define BRICK_SCALE 1.2
+#define BRICK_WIDTH 160*BRICK_SCALE
+#define BRICK_HEIGHT 40*BRICK_SCALE
 
 Scene* Breaker::createScene()
 {
@@ -37,6 +42,7 @@ bool Breaker::init()
     this->playTimes = 0;
     this->playerTag = 10;
     this->ballTag = 11;
+    this->statusLabelTag = 12;
     
     this->visibleSize = Director::getInstance()->getVisibleSize();
     this->origin = Director::getInstance()->getVisibleOrigin();
@@ -47,13 +53,14 @@ bool Breaker::init()
     edges[2] = Vec2(this->visibleSize.width/2, this->visibleSize.height/2);
     edges[3] = Vec2(this->visibleSize.width/2, -this->visibleSize.height/2);
     
-    auto edgesBody = PhysicsBody::createEdgeChain(edges, 4, PhysicsMaterial(0.1f, 1.0f, 0.0f), 5.0f);
+    auto edgesBody = PhysicsBody::createEdgeChain(edges, 4, PhysicsMaterial(0.0f, 1.0f, 0.0f), 5.0f);
     auto edgesNode = Node::create();
     edgesNode->setPosition(Vec2(this->visibleSize.width/2, this->visibleSize.height/2));
     edgesNode->setPhysicsBody(edgesBody);
     this->addChild(edgesNode);
 
     createPlayer(this->playerTag);
+    createStatusLabel(this->statusLabelTag);
     gameInit();
     scheduleUpdate();
     
@@ -119,9 +126,9 @@ void Breaker::gameInit()
     
     for(int i = 1; i <= 6; i++)
     {
-        for (int j = 1; j <= 10; j++)
+        for (int j = 1; j <= 8; j++)
         {
-            Vec2 point = Vec2(this->origin.x + 40 + (BRICK_WIDTH+5)*j, this->origin.y + 400 + (BRICK_HEIGHT+3)*i);
+            Vec2 point = Vec2(this->origin.x + 60 + (BRICK_WIDTH/BRICK_SCALE-40)*j, this->origin.y + 450 + (BRICK_HEIGHT/BRICK_SCALE-6)*i);
             Sprite* brick = createBrickAtPosition(point, 20+i*10+j);
             this->bricksVec.insert(0, brick);
         }
@@ -137,7 +144,9 @@ void Breaker::gameStart()
     auto player = this->getChildByTag(this->playerTag);
     player->setPosition(Vec2(this->visibleSize.width/2 + this->origin.x, this->origin.y+PLAYER_HEIGHT/2));
     auto ball = this->getChildByTag(this->ballTag);
-    ball->getPhysicsBody()->setVelocity(Vec2(cocos2d::RandomHelper::random_int(100, 200), cocos2d::RandomHelper::random_int(100, 200)));
+    ball->getPhysicsBody()->setVelocity(Vec2(cocos2d::RandomHelper::random_int(200, 300), cocos2d::RandomHelper::random_int(200, 300)));
+    auto statusLabel = this->getChildByTag(this->statusLabelTag);
+    
 }
 
 void Breaker::gameOver()
@@ -158,7 +167,7 @@ void Breaker::createBall(int tag)
 {
     auto sp = Sprite::create("ball.png");
     sp->setTag(tag);
-    sp->setScale(0.1, 0.1);
+    sp->setScale(BALL_SCALE, BALL_SCALE);
     auto body = PhysicsBody::createCircle(sp->getContentSize().width/2);
     body->setVelocity(Vec2(0, 0));
     body->setMass(0);
@@ -168,14 +177,34 @@ void Breaker::createBall(int tag)
     body->setGravityEnable(false);
     body->setContactTestBitmask(0xFFFFFFFF);
     sp->setPhysicsBody(body);
-    sp->setPosition(Vec2(this->visibleSize.width/2, PLAYER_HEIGHT+BALL_RADIUS/2));
+    sp->setPosition(Vec2(this->visibleSize.width/2, (PLAYER_HEIGHT+BALL_RADIUS)/2));
     this->addChild(sp);
+}
+
+void Breaker::createPlayer(int tag)
+{
+    auto player = Sprite::create("player.png");
+    player->setScale(PLAYER_SCALE, PLAYER_SCALE);
+    player->setPosition(Vec2(this->visibleSize.width/2 + this->origin.x, this->origin.y+PLAYER_HEIGHT/2));
+    player->setTag(tag);
+    
+    auto body = PhysicsBody::createBox(player->getContentSize());
+    body->setGravityEnable(false);
+    body->getShape(0)->setDensity(0.1);
+    body->getShape(0)->setFriction(0);
+    body->getShape(0)->setRestitution(1);
+    body->setDynamic(false);
+    body->setContactTestBitmask(0xFFFFFFFF);
+    player->setPhysicsBody(body);
+    
+    this->addChild(player, 1);
 }
 
 Sprite* Breaker::createBrickAtPosition(Vec2 p, int tag)
 {
-    auto brick = Sprite::create("brick.png", Rect(0, 0, BRICK_WIDTH, BRICK_HEIGHT));
+    auto brick = Sprite::create("brick.png");
     brick->setPosition(p);
+    brick->setScale(BRICK_SCALE, BRICK_SCALE);
     brick->setTag(tag);
     
     auto body = PhysicsBody::createBox(brick->getContentSize());
@@ -192,23 +221,13 @@ Sprite* Breaker::createBrickAtPosition(Vec2 p, int tag)
     return brick;
 }
 
-void Breaker::createPlayer(int tag)
+void Breaker::createStatusLabel(int tag)
 {
-    auto player = Sprite::create("player.png");
-    player->setScale(0.35, 0.35);
-    player->setPosition(Vec2(this->visibleSize.width/2 + this->origin.x, this->origin.y+PLAYER_HEIGHT/2));
-    player->setTag(tag);
-    
-    auto body = PhysicsBody::createBox(player->getContentSize());
-    body->setGravityEnable(false);
-    body->getShape(0)->setDensity(0.1);
-    body->getShape(0)->setFriction(0);
-    body->getShape(0)->setRestitution(1);
-    body->setDynamic(false);
-    body->setContactTestBitmask(0xFFFFFFFF);
-    player->setPhysicsBody(body);
-    
-    this->addChild(player, 1);
+    auto status = Label::createWithSystemFont("Tap Space to Start", "Arial", 13);
+    status->setAnchorPoint(Vec2(0, 0));
+    status->setPosition(Vec2(0, 0));
+    status->setTag(tag);
+    this->addChild(status);
 }
 
 void Breaker::registerKeyboardListener()
@@ -282,13 +301,13 @@ void Breaker::update(float delta)
         if(this->moveLeft && !this->moveRight)
         {
             auto player = this->getChildByTag(this->playerTag);
-            if(player->getPositionX() - player->getContentSize().width/2 > 0)
+            if(player->getPositionX() - (PLAYER_WIDTH-100)/2 > 0)
                 player->setPositionX(player->getPositionX() - delta*this->playerMoveSpeed);
         }
         else if(this->moveRight && !this->moveLeft)
         {
             auto player = this->getChildByTag(this->playerTag);
-            if(player->getPositionX() + player->getContentSize().width/2 < this->visibleSize.width)
+            if(player->getPositionX() + (PLAYER_WIDTH-100)/2 < this->visibleSize.width)
                 player->setPositionX(player->getPositionX() + delta*this->playerMoveSpeed);
         }
         
@@ -299,4 +318,3 @@ void Breaker::update(float delta)
         }
     }
 }
-

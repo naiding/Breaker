@@ -68,8 +68,8 @@ void HelloWorld::createBackground(int tag)
 
 void HelloWorld::createWelcomeLabel(int tag)
 {
-    //    auto label = Label::createWithTTF("Welcome to Breaker !!", "fonts/Marker Felt.ttf", 24);
-    auto label = Label::createWithSystemFont("Welcome to Breaker !!", "Arial", 40);
+    auto label = Label::createWithTTF("Welcome to Breaker !!", "fonts/Marker Felt.ttf", 40);
+//    auto label = Label::createWithSystemFont("Welcome to Breaker !!", "Arial", 40);
     label->setTag(tag);
     label->setColor(Color3B(26,83,255));
     if (label == nullptr)
@@ -85,7 +85,7 @@ void HelloWorld::createWelcomeLabel(int tag)
 
 void HelloWorld::createMenu(int tag)
 {
-    MenuItemFont::setFontName("Times New Roman");
+    MenuItemFont::setFontName("Hercunalum");
     MenuItemFont::setFontSize(30);
     
     MenuItemFont *start = MenuItemFont::create("Start", CC_CALLBACK_1(HelloWorld::menuStartCallback, this));
