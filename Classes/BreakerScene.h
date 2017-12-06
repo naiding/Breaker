@@ -11,6 +11,19 @@
 #include "cocos2d.h"
 USING_NS_CC;
 
+/////////////////////////////////////////
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
+#include <vector>
+#include <iostream>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/nonfree/nonfree.hpp>
+
+//using namespace cv;
+//using namespace std;
+/////////////////////////////////////////
+
 class Breaker : public cocos2d::Layer
 {
 public:
@@ -34,9 +47,8 @@ private:
     void gameStart();
     void gameOver();
     
-    Vec2 origin;
-    Size visibleSize;
-    
+    cocos2d::Vec2 origin;
+    cocos2d::Size visibleSize;
     
     int playerTag;
     int ballTag;
@@ -55,7 +67,60 @@ private:
     
     int playTimes;
     
-    Vector<Sprite*> bricksVec;
+    cocos2d::Vector<Sprite*> bricksVec;
+
+    ////////////////////////////
+    
+    void initGridDetector();
+    
+    double dis;
+    double outdis;
+    double disnew;
+    
+    bool gridMovingLeft;
+    bool gridMovingRight;
+    
+    cv::VideoCapture cap;
+    
+    cv::Mat src;
+    std::vector<cv::Point> srcCorner;
+    std::vector<cv::Point> dstCorner;
+    
+    cv::Ptr<cv::FeatureDetector> featureDetector;
+    cv::Ptr<cv::DescriptorExtractor> descriptorExtractor;
+    cv::Ptr<cv::DescriptorMatcher> descriptorMatcher;
+    
+    cv::Mat frame;
+    cv::Mat grayFrame;
+    cv::Mat frameImg;
+    cv::Mat queryDescriptor;
+    cv::Mat trainDescriptor;
+    std::vector<cv::KeyPoint> queryKeypoints;
+    std::vector<cv::KeyPoint> trainKeypoints;
+    
+    bool refineMatchesWithHomography(const std::vector<cv::KeyPoint>& queryKeypoints,
+                                     const std::vector<cv::KeyPoint>& trainKeypoints,
+                                     float reprojectionThreshold,
+                                     std::vector<cv::DMatch>& matches,
+                                     cv::Mat& homography,
+                                     cv::Mat& src,
+                                     cv::Mat& frameImg);
+    
+    bool matchingDescriptor(const std::vector<cv::KeyPoint>& queryKeyPoints,
+                            const std::vector<cv::KeyPoint>& trainKeyPoints,
+                            const cv::Mat& queryDescriptors,
+                            const cv::Mat& trainDescriptors,
+                            cv::Ptr<cv::DescriptorMatcher>& descriptorMatcher,
+                            cv::Mat& src,
+                            cv::Mat& frameImg,
+                            std::vector<cv::Point>& srcCorner,
+                            std::vector<cv::Point>& dstCorner,
+                            bool enableRatioTest = true);
+    
+    void checkGridOnce();
+    bool isCheckingGrid;
+    ///////////////////////////
+    
 };
 
 #endif /* BreakerScene_h */

@@ -22,6 +22,9 @@ USING_NS_CC;
 #define BRICK_WIDTH 160*BRICK_SCALE
 #define BRICK_HEIGHT 40*BRICK_SCALE
 
+#define BALL_LOWER_SPEED 100
+#define BALL_HIGHER_SPEED 200
+
 Scene* Breaker::createScene()
 {
     auto scene = Scene::createWithPhysics();
@@ -60,10 +63,11 @@ bool Breaker::init()
     this->addChild(edgesNode);
 
     createPlayer(this->playerTag);
-    createStatusLabel(this->statusLabelTag);
     gameInit();
     scheduleUpdate();
     
+    initGridDetector();
+
     return true;
 }
 
@@ -89,32 +93,6 @@ void Breaker::onExit()
     eventDispatcher -> removeAllEventListeners();
 }
 
-bool Breaker::onContactBegin(cocos2d::PhysicsContact &contact)
-{
-    log("on Contact Begin");
-    auto spriteA = (Sprite *)contact.getShapeA()->getBody()->getNode();
-    auto spriteB = (Sprite *)contact.getShapeB()->getBody()->getNode();
-    
-    for(auto brick : this->bricksVec)
-    {
-        if (brick->getTag() == spriteA->getTag())
-        {
-            this->removeChildByTag(spriteA->getTag());
-            this->bricksVec.eraseObject(brick);
-        }
-        if (brick->getTag() == spriteB->getTag())
-        {
-            this->removeChildByTag(spriteB->getTag());
-            this->bricksVec.eraseObject(brick);
-        }
-    }
-    
-//    __String *x = __String::createWithFormat("%d", spriteA->getTag());
-//    log(x->getCString());
-
-    return true;
-}
-
 void Breaker::gameInit()
 {
     this->isStart = false;
@@ -130,7 +108,8 @@ void Breaker::gameInit()
         {
             Vec2 point = Vec2(this->origin.x + 60 + (BRICK_WIDTH/BRICK_SCALE-40)*j, this->origin.y + 450 + (BRICK_HEIGHT/BRICK_SCALE-6)*i);
             Sprite* brick = createBrickAtPosition(point, 20+i*10+j);
-            this->bricksVec.insert(0, brick);
+//            this->bricksVec.insert(0, brick);
+            this->bricksVec.pushBack(brick);
         }
     }
 }
@@ -144,7 +123,7 @@ void Breaker::gameStart()
     auto player = this->getChildByTag(this->playerTag);
     player->setPosition(Vec2(this->visibleSize.width/2 + this->origin.x, this->origin.y+PLAYER_HEIGHT/2));
     auto ball = this->getChildByTag(this->ballTag);
-    ball->getPhysicsBody()->setVelocity(Vec2(cocos2d::RandomHelper::random_int(200, 300), cocos2d::RandomHelper::random_int(200, 300)));
+    ball->getPhysicsBody()->setVelocity(Vec2(cocos2d::RandomHelper::random_int(BALL_LOWER_SPEED, BALL_HIGHER_SPEED), cocos2d::RandomHelper::random_int(BALL_LOWER_SPEED, BALL_HIGHER_SPEED)));
     auto statusLabel = this->getChildByTag(this->statusLabelTag);
     
 }
@@ -240,6 +219,43 @@ void Breaker::registerKeyboardListener()
     eventDispatcher -> addEventListenerWithSceneGraphPriority(listener, this);
 }
 
+bool Breaker::onContactBegin(cocos2d::PhysicsContact &contact)
+{
+    log("on Contact Begin");
+    auto spriteA = (Sprite *)contact.getShapeA()->getBody()->getNode();
+    auto spriteB = (Sprite *)contact.getShapeB()->getBody()->getNode();
+    
+    bool isSpriteA = false;
+    bool isSpriteB = false;
+    
+    for(auto brick : this->bricksVec)
+    {
+        if (brick->getTag() == spriteA->getTag())
+        {
+            isSpriteA = true;
+//            this->removeChildByTag(spriteA->getTag());
+//            this->bricksVec.eraseObject(brick);
+        }
+        if (brick->getTag() == spriteB->getTag())
+        {
+            isSpriteB = true;
+//            this->removeChildByTag(spriteB->getTag());
+//            this->bricksVec.eraseObject(brick);
+        }
+    }
+    
+    if (isSpriteA && !isSpriteB) this->removeChildByTag(spriteA->getTag());
+    if (isSpriteB && !isSpriteA) this->removeChildByTag(spriteB->getTag());
+
+    
+    
+    //    __String *x = __String::createWithFormat("%d", spriteA->getTag());
+    //    log(x->getCString());
+    
+    return true;
+}
+
+
 void Breaker::keyPressedCallback(EventKeyboard::KeyCode keyCode, Event *event)
 {
     if (this->isStart && !this->isPause)
@@ -262,6 +278,7 @@ void Breaker::keyPressedCallback(EventKeyboard::KeyCode keyCode, Event *event)
     }
 //    __String *x = __String::createWithFormat("%d", int(keyCode));
 //    log(x->getCString());
+    
     if(int(keyCode) == 59 && !this->isStart)
     {
         log("Start !!");
@@ -283,6 +300,12 @@ void Breaker::keyPressedCallback(EventKeyboard::KeyCode keyCode, Event *event)
         auto ball = this->getChildByTag(this->ballTag);
         ball->getPhysicsBody()->setVelocity(this->ballMoveSpeed);
     }
+    
+    if(int(keyCode) == 164)
+    {
+        checkGridOnce();
+    }
+    
 }
 
 void Breaker::keyReleasedCallback(EventKeyboard::KeyCode keyCode, Event *event)
@@ -317,4 +340,229 @@ void Breaker::update(float delta)
             gameOver();
         }
     }
+    
+    if (!this->isCheckingGrid) checkGridOnce();
 }
+
+/////////////////////////////////////////////////////////////
+void Breaker::initGridDetector()
+{
+    this->dis = 0;
+    this->outdis = 0;
+    this->disnew = 0;
+    
+    this->gridMovingLeft = true;
+    this->gridMovingRight = true;
+    
+    this->src = cv::imread("/Users/naiding/Desktop/testOpencv/testOpencv/mosaic.png", 0);
+    
+    for (int i = 0; i < 6; i++) {
+        this->srcCorner.push_back(cv::Point(0, 0));
+        this->dstCorner.push_back(cv::Point(0, 0));
+    }
+    
+    this->srcCorner[0] = cv::Point(0, 0);
+    this->srcCorner[1] = cv::Point(src.cols, 0);
+    this->srcCorner[2] = cv::Point(src.cols, src.rows);
+    this->srcCorner[3] = cv::Point(0, src.rows);
+    
+    this->featureDetector = cv::FeatureDetector::create("ORB");
+    this->descriptorExtractor = cv::DescriptorExtractor::create("ORB");
+    this->descriptorMatcher = cv::DescriptorMatcher::create("BruteForce");
+    
+    this->featureDetector->detect(this->src, this->queryKeypoints);
+    this->descriptorExtractor->compute(this->src, this->queryKeypoints, this->queryDescriptor);
+    
+    this->cap.open(0);
+    if (this->cap.isOpened()) {
+        std::cout << "Camera Opened!" << std::endl;
+    } else {
+        std::cout << "Can't Open Camera!" << std::endl;
+    }
+    
+    this->isCheckingGrid = false;
+}
+
+void Breaker::checkGridOnce()
+{
+    this->isCheckingGrid = true;
+    
+    this->cap >> this->frame;
+    this->frame.copyTo(this->frameImg);
+    cvtColor(this->frame, this->grayFrame, CV_BGR2GRAY);
+    this->trainKeypoints.clear();
+    this->trainDescriptor.setTo(0);
+    this->featureDetector->detect(this->grayFrame, this->trainKeypoints);
+    
+    if (this->trainKeypoints.size() != 0)
+    {
+        this->descriptorExtractor->compute(this->grayFrame, this->trainKeypoints, this->trainDescriptor);
+        bool isFound = matchingDescriptor(this->queryKeypoints, this->trainKeypoints, this->queryDescriptor,
+                                          this->trainDescriptor, this->descriptorMatcher, this->src, this->frameImg, this->srcCorner, this->dstCorner, true);
+        if (isFound) {
+            if (this->gridMovingLeft && !this->gridMovingRight) {
+                std::cout << "left" << std::endl;
+                this->gridMovingLeft = true;
+                this->gridMovingRight = true;
+                
+                auto player = this->getChildByTag(this->playerTag);
+                if(player->getPositionX() - (PLAYER_WIDTH-100)/2 > 0)
+                    player->setPositionX(player->getPositionX() - 200);
+                
+            }else if(!this->gridMovingLeft && this->gridMovingRight) {
+                std::cout << "right" << std::endl;
+                this->gridMovingLeft = true;
+                this->gridMovingRight = true;
+                
+                auto player = this->getChildByTag(this->playerTag);
+                if(player->getPositionX() + (PLAYER_WIDTH-100)/2 < this->visibleSize.width)
+                    player->setPositionX(player->getPositionX() + 200);
+                
+            }else if(!this->gridMovingLeft && !this->gridMovingRight) {
+                std::cout << "not move" << std::endl;
+                this->gridMovingLeft = true;
+                this->gridMovingRight = true;
+            }else {
+                std::cout << "I don't know" << std::endl;
+            }
+        }
+//        cv::imshow("foundImg", frameImg);
+    }
+    this->isCheckingGrid = false;
+}
+
+bool Breaker::refineMatchesWithHomography(const std::vector<cv::KeyPoint>& queryKeypoints,
+                                 const std::vector<cv::KeyPoint>& trainKeypoints,
+                                 float reprojectionThreshold,
+                                 std::vector<cv::DMatch>& matches,
+                                 cv::Mat& homography,
+                                 cv::Mat& src,
+                                 cv::Mat& frameImg)
+{
+    const int minNumberMatchesAllowed = 6;
+    if (matches.size() < minNumberMatchesAllowed)
+        return false;
+    // Prepare data for cv::findHomography
+    std::vector<cv::Point2f> queryPoints(matches.size());
+    std::vector<cv::Point2f> trainPoints(matches.size());
+    for (size_t i = 0; i < matches.size(); i++)
+    {
+        queryPoints[i] = queryKeypoints[matches[i].queryIdx].pt;
+        trainPoints[i] = trainKeypoints[matches[i].trainIdx].pt;
+    }
+    // Find homography matrix and get inliers mask
+    std::vector<unsigned char> inliersMask(matches.size());
+    homography = cv::findHomography(queryPoints,
+                                    trainPoints,
+                                    CV_FM_RANSAC,
+                                    reprojectionThreshold,
+                                    inliersMask);
+    std::vector<cv::DMatch> inliers;
+    for (size_t i = 0; i<inliersMask.size(); i++)
+        if (inliersMask[i])
+            inliers.push_back(matches[i]);
+    matches.swap(inliers);
+    cv::Mat homoShow;
+    drawMatches(src, queryKeypoints, frameImg, trainKeypoints, matches, homoShow, cv::Scalar::all(-1), CV_RGB(255, 255, 255), cv::Mat(), 2);
+    imshow("homoShow", homoShow);
+    return matches.size() > minNumberMatchesAllowed;
+}
+
+
+bool Breaker::matchingDescriptor(const std::vector<cv::KeyPoint>& queryKeyPoints,
+                        const std::vector<cv::KeyPoint>& trainKeyPoints,
+                        const cv::Mat& queryDescriptors,
+                        const cv::Mat& trainDescriptors,
+                        cv::Ptr<cv::DescriptorMatcher>& descriptorMatcher,
+                        cv::Mat& src,
+                        cv::Mat& frameImg,
+                        std::vector<cv::Point>& srcCorner,
+                        std::vector<cv::Point>& dstCorner,
+                        bool enableRatioTest)
+{
+//    enableRatioTest = true;
+    std::vector<std::vector<cv::DMatch>> m_knnMatches;
+    std::vector<cv::DMatch>m_Matches;
+    
+    if (enableRatioTest)
+    {
+        const float minRatio = 1.f / 1.5f;
+        descriptorMatcher->knnMatch(queryDescriptors, trainDescriptors, m_knnMatches, 2);
+        for (size_t i = 0; i<m_knnMatches.size(); i++)
+        {
+            const cv::DMatch& bestMatch = m_knnMatches[i][0];
+            const cv::DMatch& betterMatch = m_knnMatches[i][1];
+            float distanceRatio = bestMatch.distance / betterMatch.distance;
+            if (distanceRatio < minRatio)
+                m_Matches.push_back(bestMatch);
+        }
+    }
+    else
+    {
+        std::cout << "Cross-Check" << std::endl;
+        cv::Ptr<cv::DescriptorMatcher> BFMatcher(new cv::BFMatcher(cv::NORM_HAMMING, true));
+        BFMatcher->match(queryDescriptors, trainDescriptors, m_Matches);
+    }
+    cv::Mat homo;
+    float homographyReprojectionThreshold = 1.0;
+    bool homographyFound = refineMatchesWithHomography(queryKeyPoints, trainKeyPoints, homographyReprojectionThreshold, m_Matches, homo, src, frameImg);
+    
+    if (!homographyFound)
+        return false;
+    else
+    {
+        double h[9];
+        bool isFound = true;
+        h[0] = homo.at<double>(0, 0);
+        h[1] = homo.at<double>(0, 1);
+        h[2] = homo.at<double>(0, 2);
+        h[3] = homo.at<double>(1, 0);
+        h[4] = homo.at<double>(1, 1);
+        h[5] = homo.at<double>(1, 2);
+        h[6] = homo.at<double>(2, 0);
+        h[7] = homo.at<double>(2, 1);
+        h[8] = homo.at<double>(2, 2);
+        
+        for (int i = 0; i<6; i++)
+        {
+            float x = (float)srcCorner[i].x;
+            float y = (float)srcCorner[i].y;
+            float Z = (float)1. / (h[6] * x + h[7] * y + h[8]);
+            float X = (float)(h[0] * x + h[1] * y + h[2])*Z;
+            float Y = (float)(h[3] * x + h[4] * y + h[5])*Z;
+            dstCorner[i] = cv::Point(int(X), int(Y));
+        }
+        
+        if (isFound)
+        {
+            line(frameImg, dstCorner[0], dstCorner[1], CV_RGB(255, 0, 0), 2);
+            line(frameImg, dstCorner[1], dstCorner[2], CV_RGB(255, 0, 0), 2);
+            line(frameImg, dstCorner[2], dstCorner[3], CV_RGB(255, 0, 0), 2);
+            line(frameImg, dstCorner[3], dstCorner[0], CV_RGB(255, 0, 0), 2);
+            this->disnew = (dstCorner[0].x + dstCorner[1].x + dstCorner[2].x + dstCorner[3].x + dstCorner[4].x + dstCorner[5].x) / 6;
+            this->outdis = this->disnew - this->dis;
+            this->dis = this->disnew;
+            if (this->outdis > 30)
+            {
+                this->gridMovingLeft = true;
+                this->gridMovingRight = false;
+            }
+            else if (this->outdis < -30)
+            {
+                this->gridMovingLeft = false;
+                this->gridMovingRight = true;
+            } else {
+                this->gridMovingLeft = false;
+                this->gridMovingRight = false;
+            }
+            return true;
+        }
+        if (!isFound)
+        {
+            this->dis = 0;
+        }
+        return true;
+    }
+}
+
+
