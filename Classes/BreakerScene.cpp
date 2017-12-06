@@ -246,8 +246,6 @@ bool Breaker::onContactBegin(cocos2d::PhysicsContact &contact)
     
     if (isSpriteA && !isSpriteB) this->removeChildByTag(spriteA->getTag());
     if (isSpriteB && !isSpriteA) this->removeChildByTag(spriteB->getTag());
-
-    
     
     //    __String *x = __String::createWithFormat("%d", spriteA->getTag());
     //    log(x->getCString());
@@ -400,32 +398,47 @@ void Breaker::checkGridOnce()
         bool isFound = matchingDescriptor(this->queryKeypoints, this->trainKeypoints, this->queryDescriptor,
                                           this->trainDescriptor, this->descriptorMatcher, this->src, this->frameImg, this->srcCorner, this->dstCorner, true);
         if (isFound) {
-            if (this->gridMovingLeft && !this->gridMovingRight) {
-                std::cout << "left" << std::endl;
-                this->gridMovingLeft = true;
-                this->gridMovingRight = true;
-                
-                auto player = this->getChildByTag(this->playerTag);
-                if(player->getPositionX() - (PLAYER_WIDTH-100)/2 > 0)
-                    player->setPositionX(player->getPositionX() - 200);
-                
-            }else if(!this->gridMovingLeft && this->gridMovingRight) {
-                std::cout << "right" << std::endl;
-                this->gridMovingLeft = true;
-                this->gridMovingRight = true;
-                
-                auto player = this->getChildByTag(this->playerTag);
-                if(player->getPositionX() + (PLAYER_WIDTH-100)/2 < this->visibleSize.width)
-                    player->setPositionX(player->getPositionX() + 200);
-                
-            }else if(!this->gridMovingLeft && !this->gridMovingRight) {
-                std::cout << "not move" << std::endl;
-                this->gridMovingLeft = true;
-                this->gridMovingRight = true;
-            }else {
-                std::cout << "I don't know" << std::endl;
-            }
+
+            auto player = this->getChildByTag(this->playerTag);
+            double newPositionX = player->getPositionX() - this->outdis;
+            
+            if(player->getPositionX() - (PLAYER_WIDTH-100)/2 > 0
+               && (newPositionX - (PLAYER_WIDTH-100)/2 > 0)
+               && (newPositionX + (PLAYER_WIDTH-100)/2 < this->visibleSize.width))
+                player->setPositionX(newPositionX);
+            
+            
+            
+//            if (this->gridMovingLeft && !this->gridMovingRight) {
+//                std::cout << "left" << std::endl;
+//                this->gridMovingLeft = true;
+//                this->gridMovingRight = true;
+//
+//                auto player = this->getChildByTag(this->playerTag);
+//                double newPositionX = player->getPositionX() - this->outdis;
+//                if((player->getPositionX() - (PLAYER_WIDTH-100)/2 > 0) && (newPositionX - (PLAYER_WIDTH-100)/2 > 0))
+//                    player->setPositionX(newPositionX);
+//
+//            }else if(!this->gridMovingLeft && this->gridMovingRight) {
+//                std::cout << "right" << std::endl;
+//                this->gridMovingLeft = true;
+//                this->gridMovingRight = true;
+//
+//                auto player = this->getChildByTag(this->playerTag);
+//                double newPositionX = player->getPositionX() - this->outdis;
+//                if((player->getPositionX() + (PLAYER_WIDTH-100)/2 < this->visibleSize.width)
+//                   && (newPositionX + (PLAYER_WIDTH-100)/2 < this->visibleSize.width) )
+//                    player->setPositionX(newPositionX);
+//
+//            }else if(!this->gridMovingLeft && !this->gridMovingRight) {
+//                std::cout << "not move" << std::endl;
+//                this->gridMovingLeft = true;
+//                this->gridMovingRight = true;
+//            }else {
+//                std::cout << "I don't know" << std::endl;
+//            }
         }
+        
 //        cv::imshow("foundImg", frameImg);
     }
     this->isCheckingGrid = false;
@@ -507,62 +520,37 @@ bool Breaker::matchingDescriptor(const std::vector<cv::KeyPoint>& queryKeyPoints
     float homographyReprojectionThreshold = 1.0;
     bool homographyFound = refineMatchesWithHomography(queryKeyPoints, trainKeyPoints, homographyReprojectionThreshold, m_Matches, homo, src, frameImg);
     
-    if (!homographyFound)
-        return false;
+    bool isFound = true;
+    if(m_Matches.size() >=6)
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            dstCorner[i].x = trainKeyPoints[m_Matches[i].trainIdx].pt.x;
+        }
+        isFound = true;
+    }
     else
     {
-        double h[9];
-        bool isFound = true;
-        h[0] = homo.at<double>(0, 0);
-        h[1] = homo.at<double>(0, 1);
-        h[2] = homo.at<double>(0, 2);
-        h[3] = homo.at<double>(1, 0);
-        h[4] = homo.at<double>(1, 1);
-        h[5] = homo.at<double>(1, 2);
-        h[6] = homo.at<double>(2, 0);
-        h[7] = homo.at<double>(2, 1);
-        h[8] = homo.at<double>(2, 2);
-        
-        for (int i = 0; i<6; i++)
-        {
-            float x = (float)srcCorner[i].x;
-            float y = (float)srcCorner[i].y;
-            float Z = (float)1. / (h[6] * x + h[7] * y + h[8]);
-            float X = (float)(h[0] * x + h[1] * y + h[2])*Z;
-            float Y = (float)(h[3] * x + h[4] * y + h[5])*Z;
-            dstCorner[i] = cv::Point(int(X), int(Y));
-        }
-        
-        if (isFound)
-        {
-            line(frameImg, dstCorner[0], dstCorner[1], CV_RGB(255, 0, 0), 2);
-            line(frameImg, dstCorner[1], dstCorner[2], CV_RGB(255, 0, 0), 2);
-            line(frameImg, dstCorner[2], dstCorner[3], CV_RGB(255, 0, 0), 2);
-            line(frameImg, dstCorner[3], dstCorner[0], CV_RGB(255, 0, 0), 2);
-            this->disnew = (dstCorner[0].x + dstCorner[1].x + dstCorner[2].x + dstCorner[3].x + dstCorner[4].x + dstCorner[5].x) / 6;
-            this->outdis = this->disnew - this->dis;
-            this->dis = this->disnew;
-            if (this->outdis > 30)
-            {
-                this->gridMovingLeft = true;
-                this->gridMovingRight = false;
-            }
-            else if (this->outdis < -30)
-            {
-                this->gridMovingLeft = false;
-                this->gridMovingRight = true;
-            } else {
-                this->gridMovingLeft = false;
-                this->gridMovingRight = false;
-            }
-            return true;
-        }
-        if (!isFound)
-        {
-            this->dis = 0;
-        }
+        isFound = true;
+        return false;
+    }
+    
+    if(isFound)
+    {
+        this->disnew = (dstCorner[0].x + dstCorner[1].x + dstCorner[2].x + dstCorner[3].x+ dstCorner[4].x+ dstCorner[5].x) / 6;
+        this->outdis = this->disnew - this->dis;
+        this->dis = this->disnew;
+        if (this->outdis > 30)
+            std::cout << "left" << std::endl;
+        else if (this->outdis <-30)
+            std::cout << "right" << std::endl;
         return true;
     }
-}
+    if (!isFound)
+    {
+        this->dis = 0;
+    }
+    return true;
 
+}
 
