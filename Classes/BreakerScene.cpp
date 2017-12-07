@@ -22,8 +22,28 @@ USING_NS_CC;
 #define BRICK_WIDTH 160*BRICK_SCALE
 #define BRICK_HEIGHT 40*BRICK_SCALE
 
-#define BALL_LOWER_SPEED 100
+#define BALL_LOWER_SPEED 230
 #define BALL_HIGHER_SPEED 200
+
+double antiShakeSmoothing(double x)
+{
+//    std::cout << x << std::endl;
+//    return x;
+
+//    if (x > -10 || x < 10)
+//    {
+//        return 0;
+//    }
+//    else
+    if (x > -30 || x < 30)
+    {
+        return 0.8*x;
+    }
+    else
+    {
+        return 1.2*x;
+    }
+}
 
 Scene* Breaker::createScene()
 {
@@ -123,7 +143,8 @@ void Breaker::gameStart()
     auto player = this->getChildByTag(this->playerTag);
     player->setPosition(Vec2(this->visibleSize.width/2 + this->origin.x, this->origin.y+PLAYER_HEIGHT/2));
     auto ball = this->getChildByTag(this->ballTag);
-    ball->getPhysicsBody()->setVelocity(Vec2(cocos2d::RandomHelper::random_int(BALL_LOWER_SPEED, BALL_HIGHER_SPEED), cocos2d::RandomHelper::random_int(BALL_LOWER_SPEED, BALL_HIGHER_SPEED)));
+//    ball->getPhysicsBody()->setVelocity(Vec2(cocos2d::RandomHelper::random_int(BALL_LOWER_SPEED, BALL_HIGHER_SPEED), cocos2d::RandomHelper::random_int(BALL_LOWER_SPEED, BALL_HIGHER_SPEED)));
+    ball->getPhysicsBody()->setVelocity(Vec2(BALL_LOWER_SPEED, BALL_HIGHER_SPEED));
     auto statusLabel = this->getChildByTag(this->statusLabelTag);
     
 }
@@ -149,7 +170,7 @@ void Breaker::createBall(int tag)
     sp->setScale(BALL_SCALE, BALL_SCALE);
     auto body = PhysicsBody::createCircle(sp->getContentSize().width/2);
     body->setVelocity(Vec2(0, 0));
-    body->setMass(0);
+    body->setMass(1);
     body->getShape(0)->setDensity(0.1);
     body->getShape(0)->setFriction(0);
     body->getShape(0)->setRestitution(1);
@@ -221,7 +242,7 @@ void Breaker::registerKeyboardListener()
 
 bool Breaker::onContactBegin(cocos2d::PhysicsContact &contact)
 {
-    log("on Contact Begin");
+//    log("on Contact Begin");
     auto spriteA = (Sprite *)contact.getShapeA()->getBody()->getNode();
     auto spriteB = (Sprite *)contact.getShapeB()->getBody()->getNode();
     
@@ -352,7 +373,7 @@ void Breaker::initGridDetector()
     this->gridMovingLeft = true;
     this->gridMovingRight = true;
     
-    this->src = cv::imread("/Users/naiding/Desktop/testOpencv/testOpencv/mosaic.png", 0);
+    this->src = cv::imread("mosaic.png", 0);
     
     for (int i = 0; i < 6; i++) {
         this->srcCorner.push_back(cv::Point(0, 0));
@@ -383,6 +404,7 @@ void Breaker::initGridDetector()
 
 void Breaker::checkGridOnce()
 {
+    
     this->isCheckingGrid = true;
     
     this->cap >> this->frame;
@@ -397,17 +419,29 @@ void Breaker::checkGridOnce()
         this->descriptorExtractor->compute(this->grayFrame, this->trainKeypoints, this->trainDescriptor);
         bool isFound = matchingDescriptor(this->queryKeypoints, this->trainKeypoints, this->queryDescriptor,
                                           this->trainDescriptor, this->descriptorMatcher, this->src, this->frameImg, this->srcCorner, this->dstCorner, true);
+        
         if (isFound) {
 
             auto player = this->getChildByTag(this->playerTag);
-            double newPositionX = player->getPositionX() - this->outdis;
             
-            if(player->getPositionX() - (PLAYER_WIDTH-100)/2 > 0
-               && (newPositionX - (PLAYER_WIDTH-100)/2 > 0)
-               && (newPositionX + (PLAYER_WIDTH-100)/2 < this->visibleSize.width))
-                player->setPositionX(newPositionX);
+            double antiShakeX = antiShakeSmoothing(this->outdis);
+            double newPositionX = player->getPositionX() - antiShakeX;
+
+//            std::cout<<this->outdis<<std::endl;
+
             
-            
+            if(newPositionX - (PLAYER_WIDTH-100)/2 >= 0
+               && newPositionX + (PLAYER_WIDTH-100)/2 <= this->visibleSize.width)
+            {
+               player->setPositionX(newPositionX);
+            }
+            else
+            {
+                if(newPositionX - (PLAYER_WIDTH-100)/2 < 0 )
+                    player->setPositionX((PLAYER_WIDTH-100)/2);
+                else if(newPositionX + (PLAYER_WIDTH-100)/2 > this->visibleSize.width)
+                    player->setPositionX(this->visibleSize.width - (PLAYER_WIDTH-100)/2);
+            }
             
 //            if (this->gridMovingLeft && !this->gridMovingRight) {
 //                std::cout << "left" << std::endl;
@@ -444,44 +478,6 @@ void Breaker::checkGridOnce()
     this->isCheckingGrid = false;
 }
 
-bool Breaker::refineMatchesWithHomography(const std::vector<cv::KeyPoint>& queryKeypoints,
-                                 const std::vector<cv::KeyPoint>& trainKeypoints,
-                                 float reprojectionThreshold,
-                                 std::vector<cv::DMatch>& matches,
-                                 cv::Mat& homography,
-                                 cv::Mat& src,
-                                 cv::Mat& frameImg)
-{
-    const int minNumberMatchesAllowed = 6;
-    if (matches.size() < minNumberMatchesAllowed)
-        return false;
-    // Prepare data for cv::findHomography
-    std::vector<cv::Point2f> queryPoints(matches.size());
-    std::vector<cv::Point2f> trainPoints(matches.size());
-    for (size_t i = 0; i < matches.size(); i++)
-    {
-        queryPoints[i] = queryKeypoints[matches[i].queryIdx].pt;
-        trainPoints[i] = trainKeypoints[matches[i].trainIdx].pt;
-    }
-    // Find homography matrix and get inliers mask
-    std::vector<unsigned char> inliersMask(matches.size());
-    homography = cv::findHomography(queryPoints,
-                                    trainPoints,
-                                    CV_FM_RANSAC,
-                                    reprojectionThreshold,
-                                    inliersMask);
-    std::vector<cv::DMatch> inliers;
-    for (size_t i = 0; i<inliersMask.size(); i++)
-        if (inliersMask[i])
-            inliers.push_back(matches[i]);
-    matches.swap(inliers);
-    cv::Mat homoShow;
-    drawMatches(src, queryKeypoints, frameImg, trainKeypoints, matches, homoShow, cv::Scalar::all(-1), CV_RGB(255, 255, 255), cv::Mat(), 2);
-    imshow("homoShow", homoShow);
-    return matches.size() > minNumberMatchesAllowed;
-}
-
-
 bool Breaker::matchingDescriptor(const std::vector<cv::KeyPoint>& queryKeyPoints,
                         const std::vector<cv::KeyPoint>& trainKeyPoints,
                         const cv::Mat& queryDescriptors,
@@ -493,7 +489,6 @@ bool Breaker::matchingDescriptor(const std::vector<cv::KeyPoint>& queryKeyPoints
                         std::vector<cv::Point>& dstCorner,
                         bool enableRatioTest)
 {
-//    enableRatioTest = true;
     std::vector<std::vector<cv::DMatch>> m_knnMatches;
     std::vector<cv::DMatch>m_Matches;
     
@@ -516,41 +511,49 @@ bool Breaker::matchingDescriptor(const std::vector<cv::KeyPoint>& queryKeyPoints
         cv::Ptr<cv::DescriptorMatcher> BFMatcher(new cv::BFMatcher(cv::NORM_HAMMING, true));
         BFMatcher->match(queryDescriptors, trainDescriptors, m_Matches);
     }
-    cv::Mat homo;
-    float homographyReprojectionThreshold = 1.0;
-    bool homographyFound = refineMatchesWithHomography(queryKeyPoints, trainKeyPoints, homographyReprojectionThreshold, m_Matches, homo, src, frameImg);
+    //    cv::Mat homo;
+    //    float homographyReprojectionThreshold = 1.0;
+    //    bool homographyFound = refineMatchesWithHomography(queryKeyPoints, trainKeyPoints, homographyReprojectionThreshold, m_Matches, homo, src, frameImg);
     
     bool isFound = true;
-    if(m_Matches.size() >=6)
+    int num_points = 10;
+    std::cout << m_Matches.size() << std::endl;
+    if(m_Matches.size() >=num_points)
     {
-        for (int i = 0; i < 6; i++)
+        //        double newCorner[num_points];
+        for (int i = 0; i < num_points; i++)
         {
-            dstCorner[i].x = trainKeyPoints[m_Matches[i].trainIdx].pt.x;
+            //            newCorner[i] = trainKeyPoints[m_Matches[i].trainIdx].pt.x;
+            this->disnew += trainKeyPoints[m_Matches[i].trainIdx].pt.x;
         }
+        this->disnew = this->disnew / num_points;
         isFound = true;
     }
     else
     {
+        //        log("hehe?");
+        
         isFound = true;
         return false;
     }
     
     if(isFound)
     {
-        this->disnew = (dstCorner[0].x + dstCorner[1].x + dstCorner[2].x + dstCorner[3].x+ dstCorner[4].x+ dstCorner[5].x) / 6;
+        
+        //        this->disnew =
+        //        this->disnew = (dstCorner[0].x + dstCorner[1].x + dstCorner[2].x + dstCorner[3].x+ dstCorner[4].x+ dstCorner[5].x) / 6;
         this->outdis = this->disnew - this->dis;
         this->dis = this->disnew;
-        if (this->outdis > 30)
-            std::cout << "left" << std::endl;
-        else if (this->outdis <-30)
-            std::cout << "right" << std::endl;
-        return true;
+        //        if (this->outdis > 50)
+        //            std::cout << "left" << std::endl;
+        //        else if (this->outdis <-50)
+        //            std::cout << "right" << std::endl;
+        //        return true;
     }
-    if (!isFound)
-    {
-        this->dis = 0;
-    }
+    //    if (!isFound)
+    //    {
+    //        this->dis = 0;
+    //    }
     return true;
-
 }
 
